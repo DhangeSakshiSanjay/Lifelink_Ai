@@ -35,48 +35,6 @@ Lifelink-AI is a smart healthcare web application that helps hospitals and docto
 
 ---
 
-## 👥 User Roles
-
-- Admin
-- Doctor
-- Hospital
-- Donor
-- Recipient :contentReference[oaicite:3]{index=3}
-
----
-
-## ⚙️ Technologies Used
-
-### Frontend
-- React.js
-- HTML
-- CSS
-- JavaScript
-- Tailwind CSS
-
-### Backend
-- FastAPI / Flask (Python)
-
-### Database
-- MySQL
-
-### AI & Machine Learning
-- Python
-- Scikit-learn
-- XGBoost
-- LightGBM
-- SHAP
-- Pandas
-- NumPy
-
-### APIs & Tools
-- Google Maps API
-- Git & GitHub
-- VS Code
-- Postman :contentReference[oaicite:4]{index=4}
-
----
-
 ## 🔄 Project Workflow
 
 1. User registers as Donor, Recipient, Doctor, Hospital, or Admin.
@@ -91,19 +49,3 @@ Lifelink-AI is a smart healthcare web application that helps hospitals and docto
 10. Reports and notifications are generated. :contentReference[oaicite:5]{index=5}
 
 ---
-
-## 🚀 Future Enhancements
-
-- Live ambulance tracking
-- Real-time traffic updates
-- Email & SMS notifications
-- Mobile application
-- Cloud deployment
-- Hospital integration
-- Emergency priority handling :contentReference[oaicite:6]{index=6}
-
----
-
-## 📌 Conclusion
-
-Lifelink-AI aims to make organ transplantation faster, smarter, and more efficient by combining Artificial Intelligence, Machine Learning, Explainable AI, and route optimization. The system supports hospitals and doctors by providing intelligent donor recommendations and efficient transportation planning, helping improve the chances of successful organ transplantation. :contentReference[oaicite:7]{index=7}
