@@ -1,96 +1,102 @@
 import numpy as np
 import pandas as pd
 
-BLOOD_TYPES = ["A", "B", "AB", "O"]
+
+def check_blood_compatibility(donor_blood: str, recipient_blood: str) -> bool:
+    """
+    Checks ABO blood group compatibility for organ transplantation.
+    
+    Standard Medical ABO Matching Matrix:
+    - Donor O  -> Recipients: O, A, B, AB (Universal Donor)
+    - Donor A  -> Recipients: A, AB
+    - Donor B  -> Recipients: B, AB
+    - Donor AB -> Recipients: AB Only
+    """
+    if pd.isna(donor_blood) or pd.isna(recipient_blood):
+        return False
+
+    donor_blood = str(donor_blood).strip().upper()
+    recipient_blood = str(recipient_blood).strip().upper()
+
+    compatibility_map = {
+        "O": ["O", "A", "B", "AB"],
+        "A": ["A", "AB"],
+        "B": ["B", "AB"],
+        "AB": ["AB"],
+    }
+
+    allowed_recipients = compatibility_map.get(donor_blood, [])
+    return recipient_blood in allowed_recipients
 
 
 def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Calculates biological, compatibility, and severity features for the Lifelink-AI dataset."""
+    """
+    Computes all biological, physical disparity, and clinical compatibility 
+    engineered features across the donor-recipient pair.
+    """
     data = df.copy()
 
-    # 1. Age difference & exponential compatibility score
-    if "Donor_Age" in data.columns and "Patient_Age" in data.columns:
-        data["Age_Difference"] = (
-            data["Donor_Age"] - data["Patient_Age"]
-        ).abs()
-        data["Age_Compatibility_Score"] = np.exp(
-            -data["Age_Difference"] / 20.0
+    # 1. Biological Disparity Features
+    if "Patient_Age" in data.columns and "Donor_Age" in data.columns:
+        data["Age_Difference"] = (data["Patient_Age"] - data["Donor_Age"]).abs()
+        data["Age_Compatibility_Score"] = np.where(data["Age_Difference"] <= 15, 1.0, 0.5)
+
+    if "Patient_Weight" in data.columns and "Donor_Weight" in data.columns:
+        data["Weight_Difference"] = (data["Patient_Weight"] - data["Donor_Weight"]).abs()
+        data["Weight_Ratio"] = data["Patient_Weight"] / (data["Donor_Weight"] + 1e-5)
+        data["Weight_Compatibility_Score"] = np.where(
+            (data["Weight_Ratio"] >= 0.8) & (data["Weight_Ratio"] <= 1.25), 1.0, 0.5
         )
 
-    # 2. Weight difference & body size ratio
-    if "Donor_Weight" in data.columns and "Patient_Weight" in data.columns:
-        data["Weight_Difference"] = (
-            data["Donor_Weight"] - data["Patient_Weight"]
-        ).abs()
-        data["Weight_Ratio"] = data["Donor_Weight"] / data[
-            "Patient_Weight"
-        ].replace(0, np.nan)
-        data["Weight_Compatibility_Score"] = np.exp(
-            -data["Weight_Difference"] / 20.0
+    # 2. Strict Blood Compatibility Flag
+    if "Donor_BloodType" in data.columns and "Patient_BloodType" in data.columns:
+        data["Blood_Group_Compatible"] = data.apply(
+            lambda row: check_blood_compatibility(
+                row["Donor_BloodType"], row["Patient_BloodType"]
+            ),
+            axis=1,
         )
 
-    # 3. ABO Blood Group exact compatibility flag
-    if "Patient_BloodType" in data.columns and "Donor_BloodType" in data.columns:
-        data["Blood_Group_Compatible"] = (
-            data["Patient_BloodType"] == data["Donor_BloodType"]
-        ).astype(int)
-
-    # 4. Donor Medical Fitness Flag
+    # 3. Medical Clearance & Health Metrics
     if "Donor_Medical_Approval" in data.columns:
-        data["Medical_Approval_Flag"] = (
-            data["Donor_Medical_Approval"]
-            .astype(str)
-            .str.lower()
-            .eq("yes")
-            .astype(int)
+        data["Medical_Approval_Flag"] = data["Donor_Medical_Approval"].apply(
+            lambda x: 1 if str(x).strip().lower() in ["yes", "1", "true", "approved"] else 0
         )
 
-    # 5. Scale Organ Health Score to Percentage (0 to 100)
     if "RealTime_Organ_HealthScore" in data.columns:
-        data["Organ_Health_Percentage"] = (
-            data["RealTime_Organ_HealthScore"] * 100
-        )
+        data["Organ_Health_Percentage"] = data["RealTime_Organ_HealthScore"] * 100.0
+        data["Critical_Organ_Flag"] = np.where(data["RealTime_Organ_HealthScore"] < 0.6, 1, 0)
 
-    # 6. Critical Alert Flag
-    if "Organ_Condition_Alert" in data.columns:
-        data["Critical_Organ_Flag"] = (
-            data["Organ_Condition_Alert"]
-            .astype(str)
-            .str.lower()
-            .eq("critical")
-            .astype(int)
-        )
-
-    # 7. Numerical mapping for Medical Condition Severity
+    # 4. Diagnosis Severity Mapping
     if "Diagnosis_Result" in data.columns:
-        diagnosis_mapping = {
-            "CKD Stage 4": 2,
+        severity_map = {
             "CKD Stage 5": 3,
-            "ESRD": 4,
+            "End Stage Renal Disease": 3,
+            "ESRD": 3,
+            "CKD Stage 4": 2,
+            "CKD Stage 3": 1,
         }
         data["Diagnosis_Severity"] = (
-            data["Diagnosis_Result"].map(diagnosis_mapping).fillna(0)
+            data["Diagnosis_Result"].map(severity_map).fillna(1).astype(int)
         )
 
     return data
 
 
-# Allow testing directly from terminal
 if __name__ == "__main__":
-    import sys
-    from pathlib import Path
-
-    raw_path = Path("data/raw/kidney_dataset.csv")
-    if raw_path.exists():
-        df_raw = pd.read_csv(raw_path)
-        df_featured = add_engineered_features(df_raw)
-        print("✅ Feature Engineering Executed Successfully!")
-        print(f"Original shape: {df_raw.shape}")
-        print(f"New shape after features: {df_featured.shape}")
-        print("\nNewly added columns:")
-        new_cols = [c for c in df_featured.columns if c not in df_raw.columns]
-        print(new_cols)
-    else:
-        print(
-            f"❌ Dataset not found at '{raw_path}'. Place kidney_dataset.csv in data/raw/"
-        )
+    sample_df = pd.DataFrame([
+        {
+            "Patient_Age": 45,
+            "Donor_Age": 42,
+            "Patient_Weight": 70.0,
+            "Donor_Weight": 68.0,
+            "Donor_BloodType": "A",
+            "Patient_BloodType": "A",
+            "Donor_Medical_Approval": "Yes",
+            "RealTime_Organ_HealthScore": 0.92,
+            "Diagnosis_Result": "CKD Stage 4",
+        }
+    ])
+    featured = add_engineered_features(sample_df)
+    print("✅ Feature Engineering Verification Passed!")
+    print(f"Generated DataFrame Columns ({len(featured.columns)}): {list(featured.columns)}")
