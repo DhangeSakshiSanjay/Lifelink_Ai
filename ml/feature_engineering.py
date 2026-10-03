@@ -31,12 +31,12 @@ def check_blood_compatibility(donor_blood: str, recipient_blood: str) -> bool:
 
 def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Computes all biological, physical disparity, and clinical compatibility 
-    engineered features across the donor-recipient pair.
+    Computes biological disparity, physical ratio, clinical severity,
+    and ABO compatibility features across the donor-recipient pair.
     """
     data = df.copy()
 
-    # 1. Biological Disparity Features
+    # 1. Physical & Demographics Disparity Metrics
     if "Patient_Age" in data.columns and "Donor_Age" in data.columns:
         data["Age_Difference"] = (data["Patient_Age"] - data["Donor_Age"]).abs()
         data["Age_Compatibility_Score"] = np.where(data["Age_Difference"] <= 15, 1.0, 0.5)
@@ -44,11 +44,12 @@ def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
     if "Patient_Weight" in data.columns and "Donor_Weight" in data.columns:
         data["Weight_Difference"] = (data["Patient_Weight"] - data["Donor_Weight"]).abs()
         data["Weight_Ratio"] = data["Patient_Weight"] / (data["Donor_Weight"] + 1e-5)
+        # Optimal organ size ratio is between 0.8 and 1.25
         data["Weight_Compatibility_Score"] = np.where(
             (data["Weight_Ratio"] >= 0.8) & (data["Weight_Ratio"] <= 1.25), 1.0, 0.5
         )
 
-    # 2. Strict Blood Compatibility Flag
+    # 2. Hard ABO Blood Group Compatibility Flag
     if "Donor_BloodType" in data.columns and "Patient_BloodType" in data.columns:
         data["Blood_Group_Compatible"] = data.apply(
             lambda row: check_blood_compatibility(
@@ -57,7 +58,7 @@ def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
             axis=1,
         )
 
-    # 3. Medical Clearance & Health Metrics
+    # 3. Medical Clearance & Health Flags
     if "Donor_Medical_Approval" in data.columns:
         data["Medical_Approval_Flag"] = data["Donor_Medical_Approval"].apply(
             lambda x: 1 if str(x).strip().lower() in ["yes", "1", "true", "approved"] else 0
@@ -67,7 +68,7 @@ def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
         data["Organ_Health_Percentage"] = data["RealTime_Organ_HealthScore"] * 100.0
         data["Critical_Organ_Flag"] = np.where(data["RealTime_Organ_HealthScore"] < 0.6, 1, 0)
 
-    # 4. Diagnosis Severity Mapping
+    # 4. Clinical Diagnosis Severity Mapping (Kidney Urgency)
     if "Diagnosis_Result" in data.columns:
         severity_map = {
             "CKD Stage 5": 3,
@@ -99,4 +100,4 @@ if __name__ == "__main__":
     ])
     featured = add_engineered_features(sample_df)
     print("✅ Feature Engineering Verification Passed!")
-    print(f"Generated DataFrame Columns ({len(featured.columns)}): {list(featured.columns)}")
+    print(f"Total Columns ({len(featured.columns)}): {list(featured.columns)}")

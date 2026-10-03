@@ -8,7 +8,7 @@ from ml.feature_engineering import add_engineered_features
 
 TARGET = "Match_Status"
 
-# Non-predictive metadata & leakage columns to remove before training
+# Non-predictive metadata & leakage columns to drop
 DROP_COLUMNS = [
     "Patient_ID",
     "Donor_ID",
@@ -21,7 +21,7 @@ DROP_COLUMNS = [
     "Match_Status",
 ]
 
-# Explicit list of text/categorical features
+# Categorical text features requiring One-Hot Encoding
 EXPLICIT_CATEGORICAL_COLS = [
     "Patient_BloodType",
     "Diagnosis_Result",
@@ -33,7 +33,7 @@ EXPLICIT_CATEGORICAL_COLS = [
 
 
 def load_dataset(path: str) -> pd.DataFrame:
-    """Loads dataset from CSV, handles missing files, and drops duplicate rows."""
+    """Loads CSV dataset, removes duplicates, and validates schema."""
     df = pd.read_csv(path)
     if df.empty:
         raise ValueError("Dataset is empty.")
@@ -50,13 +50,13 @@ def load_dataset(path: str) -> pd.DataFrame:
 
 def prepare_dataset(df: pd.DataFrame):
     """
-    Applies feature engineering, cleans target column, separates numeric/categorical 
-    features explicitly, and builds scikit-learn ColumnTransformer.
+    Applies feature engineering, extracts target variable,
+    and constructs a scikit-learn ColumnTransformer.
     """
     # 1. Generate engineered features
     data = add_engineered_features(df)
 
-    # 2. Extract and binary-map target variable (Yes -> 1, No -> 0)
+    # 2. Extract target column (Yes -> 1, No -> 0)
     if TARGET in data.columns:
         y = data[TARGET].astype(str).str.strip().str.lower().map({"yes": 1, "no": 0})
         if y.isna().any():
@@ -64,25 +64,23 @@ def prepare_dataset(df: pd.DataFrame):
     else:
         y = None
 
-    # 3. Drop non-predictive columns
+    # 3. Drop metadata columns
     cols_to_drop = [col for col in DROP_COLUMNS if col in data.columns]
     X = data.drop(columns=cols_to_drop)
 
-    # 4. Strictly divide Categorical vs Numerical feature sets
+    # 4. Separate Numeric vs Categorical feature sets
     categorical_features = [col for col in EXPLICIT_CATEGORICAL_COLS if col in X.columns]
-    
     for col in categorical_features:
         X[col] = X[col].astype(str)
 
     numerical_features = [col for col in X.columns if col not in categorical_features]
-
     for col in numerical_features:
         if pd.api.types.is_bool_dtype(X[col]):
             X[col] = X[col].astype(int)
         else:
             X[col] = pd.to_numeric(X[col], errors="coerce")
 
-    # 5. Define Transformation Pipelines
+    # 5. Transformation Pipelines
     numeric_pipeline = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="median")),
@@ -117,9 +115,7 @@ if __name__ == "__main__":
         X, y, preprocessor = prepare_dataset(df_raw)
         X_trans = preprocessor.fit_transform(X)
 
-        print("\n✅ Preprocessing Pipeline Built & Tested Successfully!")
+        print("\n✅ Preprocessing Pipeline Built Successfully!")
         print(f"Feature matrix (X) shape : {X.shape}")
         print(f"Transformed matrix shape : {X_trans.shape}")
         print(f"Target distribution:\n{y.value_counts()}")
-    else:
-        print(f"❌ Raw dataset not found at '{RAW_DATA_PATH}'.")

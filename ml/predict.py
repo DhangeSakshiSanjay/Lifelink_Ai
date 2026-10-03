@@ -5,7 +5,6 @@ import pandas as pd
 from ml.config import MODEL_DIR
 from ml.feature_engineering import add_engineered_features, check_blood_compatibility
 
-# Columns to drop before model prediction
 DROP_COLUMNS = [
     "Patient_ID",
     "Donor_ID",
@@ -18,7 +17,6 @@ DROP_COLUMNS = [
     "Match_Status",
 ]
 
-# Explicit list of text/categorical features
 EXPLICIT_CATEGORICAL_COLS = [
     "Patient_BloodType",
     "Diagnosis_Result",
@@ -31,8 +29,8 @@ EXPLICIT_CATEGORICAL_COLS = [
 
 def load_best_model(model_name: str = "gradient_boosting"):
     """
-    Loads trained model pipeline binary. 
-    Defaults to 'gradient_boosting' (Top Benchmark Model - F1: 0.9818, Recall: 1.0000).
+    Loads trained model pipeline binary.
+    Defaults to 'gradient_boosting' (Top Benchmark - F1: 0.9818, Recall: 1.0000).
     """
     model_path = MODEL_DIR / f"{model_name}.joblib"
     if not model_path.exists():
@@ -44,11 +42,11 @@ def load_best_model(model_name: str = "gradient_boosting"):
 
 def predict_compatibility(sample_data: dict, model_name: str = "gradient_boosting") -> dict:
     """
-    Predicts organ matching probability for a given donor-recipient pair.
-    Applies strict clinical safety rules (ABO compatibility & donor medical approval)
-    to guarantee 0% probability on medically unsafe donor-recipient pairs.
+    Predicts organ matching probability for a donor-recipient pair.
+    Applies strict clinical safety rules (ABO compatibility & medical clearance)
+    to guarantee 0% probability on medically invalid donor-recipient pairs.
     """
-    # --- STEP 1: HARD CLINICAL SAFETY GUARDRAILS ---
+    # --- LAYER 1: HARD CLINICAL SAFETY GUARDRAILS ---
     donor_blood = sample_data.get("Donor_BloodType", "")
     patient_blood = sample_data.get("Patient_BloodType", "")
     medical_approval = str(sample_data.get("Donor_Medical_Approval", "")).strip().lower()
@@ -59,12 +57,12 @@ def predict_compatibility(sample_data: dict, model_name: str = "gradient_boostin
     # Rule B: Donor Medical Clearance
     is_approved = medical_approval in ["yes", "1", "true", "approved"]
 
-    # Safety Override: Force 0% match if hard clinical constraints are violated
+    # Hard Rejection: Force 0% match if clinical safety constraints fail
     if not is_blood_ok or not is_approved:
         rejection_reasons = []
         if not is_blood_ok:
             rejection_reasons.append(
-                f"ABO Blood Group Incompatibility (Donor {donor_blood} cannot donate to Recipient {patient_blood})"
+                f"ABO Blood Incompatibility (Donor {donor_blood} cannot donate to Recipient {patient_blood})"
             )
         if not is_approved:
             rejection_reasons.append("Donor Medical Clearance Rejected")
@@ -77,7 +75,7 @@ def predict_compatibility(sample_data: dict, model_name: str = "gradient_boostin
             "clinical_warning": f"Hard Rejection: {'; '.join(rejection_reasons)}",
         }
 
-    # --- STEP 2: ML MODEL EVALUATION (For Medically Viable Pairs) ---
+    # --- LAYER 2: ML MODEL EVALUATION (For Medically Viable Pairs) ---
     pipeline = load_best_model(model_name)
 
     df_sample = pd.DataFrame([sample_data])
@@ -86,7 +84,7 @@ def predict_compatibility(sample_data: dict, model_name: str = "gradient_boostin
     cols_to_drop = [col for col in DROP_COLUMNS if col in df_featured.columns]
     df_featured = df_featured.drop(columns=cols_to_drop)
 
-    # Enforce data types to align with trained preprocessor
+    # Enforce strict data types to align with preprocessor
     for col in df_featured.columns:
         if col in EXPLICIT_CATEGORICAL_COLS:
             df_featured[col] = df_featured[col].astype(str)
@@ -143,7 +141,7 @@ if __name__ == "__main__":
     print(f"Model Engine      : {res1['model_used']}")
     print(f"Clinical Status   : {res1['clinical_warning']}")
 
-    # Test Case 2: Incompatible Blood Type Pair (Donor Type A -> Patient Type B)
+    # Test Case 2: ABO Incompatible Pair (Donor Type A -> Patient Type B)
     invalid_blood_pair = valid_pair.copy()
     invalid_blood_pair["Patient_BloodType"] = "B"
 
