@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}SHAP Explainability · LifeLink-AI{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><div class="eyebrow">EXPLAINABLE AI</div><h1>SHAP Explanation Dashboard</h1><p class="muted">Understand why the selected ML model scored a donor–recipient match the way it did.</p></div>
+  <span class="security-pill"><i class="bi bi-shield-check"></i> Human review required</span>
+</div>
+
+<div class="panel filter-panel">
+  <form class="row g-3 align-items-end">
+    <div class="col-lg-9"><label>Recommendation to explain</label>
+      <select name="match_id" class="form-select form-select-lg">
+      {% for m in matches %}<option value="{{m.id}}" {% if selected and selected.id==m.id %}selected{% endif %}>#{{m.id}} · {{m.donor.name}} → {{m.recipient.name}} · {{'%.1f'|format(m.score)}}% · {{m.status}}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-lg-3"><button class="btn btn-primary btn-lg w-100"><i class="bi bi-stars"></i> Explain Match</button></div>
+  </form>
+</div>
+
+{% if selected %}
+<div class="stats">
+  <div class="stat"><div><span>Compatibility Score</span><b>{{'%.1f'|format(selected.score)}}%</b><small>model probability</small></div><i class="bi bi-speedometer2"></i></div>
+  <div class="stat"><div><span>Model</span><b class="small-stat">{{selected.model}}</b><small>selected by F1</small></div><i class="bi bi-cpu"></i></div>
+  <div class="stat"><div><span>Positive Drivers</span><b>{{positive|length}}</b><small>push score upward</small></div><i class="bi bi-arrow-up-circle"></i></div>
+  <div class="stat"><div><span>Negative Drivers</span><b>{{negative|length}}</b><small>push score downward</small></div><i class="bi bi-arrow-down-circle"></i></div>
+</div>
+
+<div class="grid2 mt-4">
+  <div class="panel">
+    <div class="panel-head"><div><h3>Local feature contribution</h3><p>SHAP impact for this specific recommendation.</p></div><span class="badge-soft">Match #{{selected.id}}</span></div>
+    <div class="shap-big-list">
+    {% for x in explanation %}
+      {% set magnitude=[(x.impact|abs)*30,100]|min %}
+      <div class="shap-big-row">
+        <div class="shap-feature"><b>{{x.feature|replace('_',' ')|title}}</b><small>Input value: {{x.value}}</small></div>
+        <div class="shap-axis"><span class="zero"></span><i class="{{'positive' if x.impact>=0 else 'negative'}}" style="width:{{magnitude}}%"></i></div>
+        <strong class="{{'impact-positive' if x.impact>=0 else 'impact-negative'}}">{{'+' if x.impact>=0 else ''}}{{'%.4f'|format(x.impact)}}</strong>
+      </div>
+    {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div><h3>Feature importance</h3><p>Absolute SHAP impact, highest first.</p></div></div>
+    <canvas id="shapChart" height="300"></canvas>
+    <div class="legend-row"><span><i class="legend-dot positive-dot"></i> Positive contribution</span><span><i class="legend-dot negative-dot"></i> Negative contribution</span></div>
+  </div>
+</div>
+
+<div class="grid2 mt-4">
+  <div class="panel">
+    <div class="panel-head"><div><h3>Why the score increased</h3><p>Features with positive SHAP contribution.</p></div></div>
+    {% for x in positive %}<div class="insight-row"><div class="insight-icon positive-bg"><i class="bi bi-arrow-up"></i></div><div><b>{{x.feature|replace('_',' ')|title}}</b><small>Value {{x.value}} · contribution +{{'%.4f'|format(x.impact)}}</small></div></div>{% else %}<div class="empty"><p>No positive contribution recorded.</p></div>{% endfor %}
+  </div>
+  <div class="panel">
+    <div class="panel-head"><div><h3>Why the score decreased</h3><p>Features with negative SHAP contribution.</p></div></div>
+    {% for x in negative %}<div class="insight-row"><div class="insight-icon negative-bg"><i class="bi bi-arrow-down"></i></div><div><b>{{x.feature|replace('_',' ')|title}}</b><small>Value {{x.value}} · contribution {{'%.4f'|format(x.impact)}}</small></div></div>{% else %}<div class="empty"><p>No negative contribution recorded.</p></div>{% endfor %}
+  </div>
+</div>
+
+<div class="panel mt-4">
+  <div class="panel-head"><div><h3>Clinical feature context</h3><p>Raw values supplied to the model for this demonstration record.</p></div></div>
+  <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Feature</th><th>Value</th><th>Interpretation in demo model</th></tr></thead><tbody>
+  {% for x in explanation %}<tr><td><b>{{x.feature|replace('_',' ')|title}}</b></td><td>{{x.value}}</td><td>{% if x.impact>=0 %}<span class="reviewed">Positive model contribution</span>{% else %}<span class="badge-soft">Negative model contribution</span>{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+
+<div class="disclaimer"><i class="bi bi-info-circle"></i> SHAP explains the behavior of the trained demonstration model; it does not establish medical causality or replace transplant-clinician judgment. The project uses synthetic/demo data.</div>
+
+<script>
+const shapData={{explanation|tojson}};
+new Chart(document.getElementById('shapChart'),{type:'bar',data:{labels:shapData.map(x=>x.feature.replaceAll('_',' ')),datasets:[{label:'|SHAP impact|',data:shapData.map(x=>Math.abs(x.impact)),borderRadius:7}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true},y:{ticks:{font:{size:10}}}}}});
+</script>
+{% else %}
+<div class="empty panel"><i class="bi bi-stars"></i><h4>No recommendation available</h4><p>Create an AI recommendation first, then open this dashboard.</p></div>
+{% endif %}
+{% endblock %}

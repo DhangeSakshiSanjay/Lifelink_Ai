@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} · LifeLink-AI{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><div class="eyebrow">LIFELINK-AI / {{ current_user.role|upper }} PORTAL</div><h1>{{ title }}</h1><p class="muted">{{ subtitle }}</p></div>
+  <div class="live-pill"><span></span> DEMO SYSTEM ONLINE</div>
+</div>
+<div class="stats">
+{% for label,value,caption,icon in stats %}<div class="stat"><div><span>{{ label }}</span><b class="{% if value|string|length > 12 %}small-stat{% endif %}">{{ value }}</b><small>{{ caption }}</small></div><i class="bi {{ icon }}"></i></div>{% endfor %}
+</div>
+<div class="role-grid mt-4">
+  <div class="panel">
+    <div class="panel-head"><div><h3>Quick actions</h3><p>Tools available to your role</p></div></div>
+    {% for href,label,desc,icon in actions %}<a class="role-action" href="{{ href }}"><span class="role-action-icon"><i class="bi {{ icon }}"></i></span><span><b>{{ label }}</b><small>{{ desc }}</small></span><i class="bi bi-arrow-right ms-auto"></i></a>{% endfor %}
+  </div>
+  <div class="panel role-focus">
+    {% if role_key == 'admin' %}<div class="icon-tile"><i class="bi bi-command"></i></div><div class="eyebrow">ADMIN CONTROL</div><h2>One system view.<br>Complete traceability.</h2><p>Manage registry data, monitor the AI workflow, and verify every approval and transport event through the audit trail.</p>
+    {% elif role_key == 'doctor' %}<div class="icon-tile"><i class="bi bi-heart-pulse"></i></div><div class="eyebrow">CLINICAL REVIEW</div><h2>AI recommends.<br>You decide.</h2><p>Review compatibility scores and SHAP explanations before approving a recommendation. Approved matches unlock transport planning.</p>
+    {% elif role_key == 'hospital' %}<div class="icon-tile"><i class="bi bi-truck"></i></div><div class="eyebrow">OPERATIONS</div><h2>Move approved organs<br>with confidence.</h2><p>Plan the weighted shortest route, monitor ETA and update the transport lifecycle from planned to delivered.</p>
+    {% elif role_key == 'donor' %}<div class="icon-tile"><i class="bi bi-heart-fill"></i></div><div class="eyebrow">DONOR PORTAL</div><h2>Your contribution<br>starts the chain.</h2><p>Your profile is used only as registry information in this decision-support prototype. Availability changes are handled by authorized coordinators.</p>
+    {% else %}<div class="icon-tile"><i class="bi bi-person-heart"></i></div><div class="eyebrow">RECIPIENT PORTAL</div><h2>Track your request<br>through every stage.</h2><p>See your request status and matching progress. Final matching and medical decisions remain under authorized clinical review.</p>{% endif %}
+  </div>
+</div>
+{% if role_key in ['donor','recipient'] and profile %}
+<div class="panel mt-4" id="profile"><div class="panel-head"><div><h3>{{ 'My donor profile' if role_key == 'donor' else 'My recipient request' }}</h3><p>Registered demonstration data</p></div><span class="status {{ profile.status|lower }}">{{ profile.status }}</span></div>
+<div class="profile-grid">
+{% if role_key == 'donor' %}<div><small>Name</small><b>{{ profile.name }}</b></div><div><small>Organ</small><b>{{ profile.organ }}</b></div><div><small>Blood group</small><b>{{ profile.blood_group }}</b></div><div><small>Location</small><b>{{ profile.location }}</b></div><div><small>HLA compatibility</small><b>{{ profile.hla_match }}%</b></div><div><small>Harvest time</small><b>{{ profile.harvest_hours }} hrs</b></div>
+{% else %}<div><small>Name</small><b>{{ profile.name }}</b></div><div><small>Requested organ</small><b>{{ profile.organ }}</b></div><div><small>Blood group</small><b>{{ profile.blood_group }}</b></div><div><small>Urgency</small><b>{{ profile.urgency }}</b></div><div><small>Waiting days</small><b>{{ profile.waiting_days }}</b></div><div><small>Location</small><b>{{ profile.location }}</b></div>{% endif %}
+</div></div>{% endif %}
+<div class="panel mt-4" id="matches"><div class="panel-head"><div><h3>{{ 'Recent activity' if role_key in ['admin','hospital'] else 'Recent matching activity' }}</h3><p>{{ 'Latest system events for your role' }}</p></div></div>
+{% if recent %}{% for item in recent %}{% if role_key == 'hospital' %}<div class="match-row"><div class="avatar"><i class="bi bi-truck"></i></div><div class="flex-grow-1"><b>Transport #{{ item.id }}</b><small>{{ item.source }} → {{ item.destination }} · {{ item.distance|round(0) }} km · {{ item.eta|round(1) }} hr</small></div><span class="status {{ item.status|lower|replace(' ','-') }}">{{ item.status }}</span></div>{% else %}<div class="match-row"><div class="avatar">{{ item.donor.name[0] }}</div><div class="flex-grow-1"><b><a href="/case/{{item.id}}" class="text-decoration-none">{{ item.donor.name }} <span class="arrow">→</span> {{ item.recipient.name }}</a></b><small>{{ item.donor.organ }} · {{ item.model }} · Priority {{'%.0f'|format(item.priority_score or 0)}}%</small></div><div class="score">{{ '%.1f'|format(item.score) }}%</div><span class="status {{ item.status|lower }}">{{ item.status }}</span></div>{% endif %}{% endfor %}{% else %}<div class="empty">No activity yet.</div>{% endif %}</div>
+<div class="disclaimer"><i class="bi bi-info-circle me-1"></i> LifeLink-AI is a decision-support prototype. AI outputs do not replace clinical judgment, consent, or authorized transplant procedures.</div>
+{% endblock %}
